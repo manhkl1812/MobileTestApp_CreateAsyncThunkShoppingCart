@@ -1,9 +1,12 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
-interface Product {
+export interface Product {
   id: number;
   title: string; 
   price: number;
+  description?: string;
+  category?: string;
+  image?: string;
 }
 
 interface ProductsState {
@@ -14,14 +17,11 @@ interface ProductsState {
 
 const API_URL = 'https://fakestoreapi.com/products';
 
-export const fetchProducts = createAsyncThunk(
-  'products/fetchProducts',
-  async () => {
-    const response = await fetch(API_URL);
-    if (!response.ok) throw new Error('Lỗi tải dữ liệu');
-    return (await response.json()) as Product[];
-  }
-);
+export const fetchProducts = createAsyncThunk('products/fetchProducts', async () => {
+  const response = await fetch(API_URL);
+  if (!response.ok) throw new Error('Lỗi tải dữ liệu');
+  return (await response.json()) as Product[];
+});
 
 export const addProduct = createAsyncThunk(
   'products/addProduct',
@@ -31,6 +31,7 @@ export const addProduct = createAsyncThunk(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newProduct),
     });
+    if (!response.ok) throw new Error('Lỗi thêm sản phẩm');
     return (await response.json()) as Product;
   }
 );
@@ -43,6 +44,7 @@ export const updateProduct = createAsyncThunk(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(product),
     });
+    if (!response.ok) throw new Error('Lỗi cập nhật');
     return (await response.json()) as Product;
   }
 );
@@ -50,9 +52,8 @@ export const updateProduct = createAsyncThunk(
 export const deleteProduct = createAsyncThunk(
   'products/deleteProduct',
   async (id: number) => {
-    await fetch(`${API_URL}/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Lỗi xóa');
     return id; 
   }
 );
@@ -69,6 +70,7 @@ const productsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // FETCH
       .addCase(fetchProducts.pending, (state) => { state.status = 'loading'; })
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -76,15 +78,19 @@ const productsSlice = createSlice({
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message || 'Lỗi';
+        state.error = action.error.message || 'Lỗi tải dữ liệu';
       })
+      // ADD
       .addCase(addProduct.fulfilled, (state, action) => {
-        state.items.push(action.payload);
+        // fakestoreapi trả về id mới, ta đẩy vào đầu danh sách cho dễ thấy
+        state.items.unshift(action.payload);
       })
+      // UPDATE
       .addCase(updateProduct.fulfilled, (state, action) => {
         const index = state.items.findIndex(item => item.id === action.payload.id);
         if (index !== -1) state.items[index] = action.payload;
       })
+      // DELETE
       .addCase(deleteProduct.fulfilled, (state, action) => {
         state.items = state.items.filter(item => item.id !== action.payload);
       });
